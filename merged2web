@@ -3,6 +3,7 @@
 # Output a web page with a leaflet animation of the
 # merged tracks given as input
 ifile="${1:-/dev/stdin}"
+rm -rf "$ofile"
 ofile="${2:-/dev/stdout}"
 exec 3<> "$ofile"
 
@@ -98,7 +99,6 @@ cat <<HERE >&3
 			}
 
 			var frame  = 0;
-			var eff_prev = 0;
 			var speed  = 1;
 			var paused = 0;
 			var colors = ["red","blue","green","purple","orange","black","brown","magenta","cyan"];
@@ -121,21 +121,37 @@ cat <<HERE >&3
 				paths.push(path);
 			}
 			function mod(a,b) { var c = a%b; return c<0?c+b:c; }
+			function interp(p0,p1,x) {
+				return L.latLng(
+					p0.lat+(p1.lat-p0.lat)*x,
+					p0.lng+(p1.lng-p0.lng)*x,
+					p0.alt+(p1.alt-p0.alt)*x);
+			}
 			function set_frame(i) {
 				frame = i;
-				var eff = mod(Math.floor(i),coords.length);
-				for(var j = 0; j < np; j++)
-					points[j].setLatLng(coords[eff][1+j]);
-				if(Math.abs(eff-eff_prev) >= 1)
-					set_path_length(i);
-				eff_prev = eff;
+				var eff = mod(i,coords.length);
+				var e0  = Math.floor(eff);
+				var e1  = Math.min(e0+1,nsamp-1);
+				for(var j = 0; j < np; j++) {
+					var p0 = coords[e0][1+j];
+					var p1 = coords[e1][1+j];
+					var p  = interp(p0,p1,eff-e0);
+					points[j].setLatLng(p);
+				}
+				set_path_length(i);
 			}
 			function set_path_length(i) {
-				var eff = mod(Math.floor(i),coords.length);
+				var eff = mod(i,coords.length);
+				var e0  = Math.floor(eff);
+				var e1  = Math.min(e0+1,nsamp-1);
 				for(var i = 0; i < np; i++) {
 					var latlngs = [];
-					for(var j = 0; j < eff; j++)
+					for(var j = 0; j < e0; j++)
 						latlngs.push(coords[j][1+i]);
+					var p0 = coords[e0][1+i];
+					var p1 = coords[e1][1+i];
+					var p  = interp(p0,p1,eff-e0);
+					latlngs.push(p);
 					paths[i].setLatLngs(latlngs);
 				}
 			}
@@ -147,8 +163,10 @@ cat <<HERE >&3
 			document.onkeydown = function(e) {
 				if(e.keyCode == code(" ") || e.keyCode == code("p"))
 					paused = 1-paused;
-				else if(e.keyCode == code("j")) set_frame(frame+20);
-				else if(e.keyCode == code("l")) set_frame(frame-20);
+				else if(e.keyCode == code("j")) set_frame(frame+speed*80);
+				else if(e.keyCode == code("l")) set_frame(frame-speed*80);
+				else if(e.keyCode == 190) set_frame(frame+1);
+				else if(e.keyCode == 188) set_frame(frame-1);
 				else if(e.keyCode == code("i")) speed *= 2;
 				else if(e.keyCode == code("k")) speed /= 2;
 				else if(e.keyCode == code("o")) speed  = 1;
