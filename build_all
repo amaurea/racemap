@@ -1,0 +1,9 @@
+#!/bin/bash
+for i in *; do
+	if [[ ! -d "$i" ]]; then continue; fi
+	for j in $i/*.gpx; do
+		./gpx2txt "$j" "${j/.gpx/.txt}"
+	done
+	python merge_tracks.py $i/track*.txt $i/merged.txt
+	./merged2web $i/merged.txt $i/index.html
+done

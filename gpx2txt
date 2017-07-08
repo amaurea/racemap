@@ -1,0 +1,15 @@
+#!/bin/bash
+ifile="${1:-/dev/stdin}"
+ofile="${2:-/dev/stdout}"
+awk '{
+	if(match($0,"<trkpt lat=\"(.*)\" lon=\"(.*)\">",a)) {
+		lat=a[1];lon=a[2];
+	} else if(match($0,"<ele>(.*)</ele>",a)) {
+		ele=a[1];
+	} else if(match($0,"<time>(.*)-(.*)-(.*)T(.*):(.*):(.*)Z</time>",a)) {
+		time=sprintf("%04d %02d %02d %02d %02d %02.0f",a[1],a[2],a[3],a[4],a[5],a[6])
+		ctime=mktime(time)
+	} else if(match($0,"</trkpt>")) {
+		printf("%8d %11.6f %11.6f %6.1f\n",ctime,lat,lon,ele)
+	}
+}' "$ifile" > "$ofile"
